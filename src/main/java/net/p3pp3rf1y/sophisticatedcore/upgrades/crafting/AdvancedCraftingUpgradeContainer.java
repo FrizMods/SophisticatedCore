@@ -13,6 +13,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.CraftingRecipe;
 import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraft.world.level.Level;
+import net.minecraftforge.items.IItemHandler;
 import net.minecraftforge.items.ItemHandlerHelper;
 import net.p3pp3rf1y.sophisticatedcore.common.gui.ICraftingContainer;
 import net.p3pp3rf1y.sophisticatedcore.common.gui.SlotSuppliedHandler;
@@ -71,7 +72,11 @@ public class AdvancedCraftingUpgradeContainer extends UpgradeContainerBase<Advan
 					ItemStack itemstack = craftMatrix.getItem(i);
 					ItemStack itemstack1 = items.get(i);
 					if (!itemstack.isEmpty()) {
-						refillCraftingGrid(itemstack, i);
+						if (refillCraftingGrid(itemstack, i)) {
+							onCraftMatrixChanged(craftMatrix);
+						} else {
+							craftMatrix.removeItem(i, 1);
+						}
 						itemstack = craftMatrix.getItem(i);
 					}
 
@@ -112,72 +117,44 @@ public class AdvancedCraftingUpgradeContainer extends UpgradeContainerBase<Advan
 					}
 				}
 			}
+
+			public boolean refillCraftingGrid(ItemStack itemstack, int i) {
+				CraftingRefillType refillType = shouldRefillCraftingGrid();
+				switch (refillType) {
+					case RefillFromStorage:
+						return extractFromStorage(itemstack);
+					case RefillFromPlayer:
+						return extractFromPlayer(itemstack);
+					case RefillFromPlayerThenStorage:
+						return extractFromPlayer(itemstack) || extractFromStorage(itemstack);
+					case RefillFromStorageThenPlayer:
+						return extractFromStorage(itemstack) || extractFromPlayer(itemstack);
+					default:
+						return false;
+				}
+			}
+
+			private boolean extractFromPlayer(ItemStack itemstack) {
+				int playerInvMatchingIndex = player.getInventory().findSlotMatchingItem(itemstack);
+				if (playerInvMatchingIndex >= 0) {
+					player.getInventory().removeItem(playerInvMatchingIndex, 1);
+					return true;
+				}
+				return false;
+			}
+
+			private boolean extractFromStorage(ItemStack itemstack) {
+				IItemHandler storageInv = upgradeWrapper.getStorageWrapper().getInventoryHandler();
+				int storageInvMatchingIndex = InventoryHelper.findMatchingItemInInventory(itemstack, storageInv);
+				if (storageInvMatchingIndex >= 0) {
+					storageInv.extractItem(storageInvMatchingIndex, 1, false);
+					return true;
+				}
+				return false;
+			}
 		};
 		slots.add(craftingResultSlot);
 	}
-
-	public void refillCraftingGrid(ItemStack itemstack, int i) {
-		CraftingRefillType refillType = shouldRefillCraftingGrid();
-		switch (refillType) {
-			case RefillFromStorage:
-				handleRefillFromStorageOnly(itemstack, i);
-				break;
-			case RefillFromPlayer:
-				handleRefillFromPlayerOnly(itemstack, i);
-				break;
-			case RefillFromPlayerThenStorage:
-				handleRefill(itemstack, i, true);
-				break;
-			case RefillFromStorageThenPlayer:
-				handleRefill(itemstack, i, false);
-				break;
-			default:
-				craftMatrix.removeItem(i, 1);
-				break;
-		}
-	}
-
-	private void handleRefillFromStorageOnly(ItemStack itemstack, int i) {
-		if (!extractFromStorage(itemstack)) {
-			craftMatrix.removeItem(i, 1);
-		} else {
-			onCraftMatrixChanged(craftMatrix);
-		}
-	}
-
-	private void handleRefillFromPlayerOnly(ItemStack itemstack, int i) {
-		if (!extractFromPlayer(itemstack)) {
-			craftMatrix.removeItem(i, 1);
-		} else {
-			onCraftMatrixChanged(craftMatrix);
-		}
-	}
-
-	private void handleRefill(ItemStack itemstack, int i, boolean firstFromPlayer) {
-		if (extractFromInventory(itemstack, firstFromPlayer) || extractFromInventory(itemstack, !firstFromPlayer)) {
-			onCraftMatrixChanged(craftMatrix);
-		} else {
-			craftMatrix.removeItem(i, 1);
-		}
-	}
-
-	private boolean extractFromInventory(ItemStack itemstack, boolean fromPlayer) {
-		return fromPlayer ? extractFromPlayer(itemstack) : extractFromStorage(itemstack);
-	}
-
-	private boolean extractFromPlayer(ItemStack itemstack) {
-		int playerInvMatchingIndex = player.getInventory().findSlotMatchingItem(itemstack);
-		if (playerInvMatchingIndex >= 0) {
-			player.getInventory().removeItem(playerInvMatchingIndex, 1);
-			return true;
-		}
-		return false;
-	}
-
-	private boolean extractFromStorage(ItemStack itemstack) {
-		return !InventoryHelper.extractFromInventory(itemstack.getItem(), 1, upgradeWrapper.getStorageWrapper().getInventoryHandler(), false).isEmpty();
-	}
-
 
 	@Override
 	public void onInit() {

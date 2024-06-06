@@ -133,6 +133,18 @@ public class InventoryHelper {
 		return ret;
 	}
 
+	public static int findMatchingItemInInventory(ItemStack pStack, IItemHandler inventory) {
+		int slots = inventory.getSlots();
+		for(int slot = 0; slot < slots; slot++) {
+			ItemStack slotStack = inventory.getStackInSlot(slot);
+			if (!slotStack.isEmpty() && ItemStack.isSameItemSameTags(pStack, slotStack)) {
+				return slot;
+			}
+		}
+
+		return -1;
+	}
+
 	public static ItemStack extractFromInventory(ItemStack stack, IItemHandler inventory, boolean simulate) {
 		int extractedCount = 0;
 		int slots = inventory.getSlots();
